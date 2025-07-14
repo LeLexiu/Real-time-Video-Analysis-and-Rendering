@@ -13,7 +13,7 @@ from collections import defaultdict
 # Load YOLOv8 pose model
 # This will be the starting model to extract poses from videos.
 # However, you can replace it with any other pose model compatible with YOLOv8.
-model = YOLO("yolov8n-pose.pt")
+model = YOLO("models/yolov8n-pose.pt")
 
 # COCO skeleton connections (keypoint pairs)
 # This defines the connections between keypoints for drawing the skeleton.
