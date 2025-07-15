@@ -85,7 +85,7 @@ def calculate_frame_score(video_angles, camera_angles, frame_index, score_thresh
         return sum(frame_scores) / len(frame_scores)
     return 0 # 如果没有可比较的关节，返回0
 
-def calculate_final_score(video_angles, camera_angles, score_threshold=20):
+def calculate_final_score(video_angles, camera_angles, score_threshold=20, reaction_time_frames=0):
     """Calculates the final score based on the entire video."""
     # 确保字典不为空，并且有至少一个关节的角度列表 Make sure the dictionaries are not empty and have at least one joint's angle list
     if not video_angles or not camera_angles:
@@ -95,9 +95,47 @@ def calculate_final_score(video_angles, camera_angles, score_threshold=20):
     first_joint_video_len = len(next(iter(video_angles.values()))) if video_angles else 0
     first_joint_camera_len = len(next(iter(camera_angles.values()))) if camera_angles else 0
 
-    min_len = min(first_joint_video_len, first_joint_camera_len)
+    start_video_idx = reaction_time_frames
 
-    if min_len == 0:
+    #min_len = min(first_joint_video_len, first_joint_camera_len)
+    comparison_length = min(
+        first_joint_video_len - start_video_idx,
+        first_joint_camera_len
+    )
+
+    if comparison_length <= 0:  # 如果没有足够的帧进行对比
+        return 0
+
+    all_joint_scores = []
+    for joint_name in JOINT_TRIPLETS:
+        # 获取关节的原始角度列表
+        video_angles_joint_raw = video_angles.get(joint_name, [])
+        camera_angles_joint_raw = camera_angles.get(joint_name, [])
+
+        accuracy_count = 0
+        for i in range(comparison_length):
+            # 视频帧的实际索引是 start_video_idx + i
+            # 摄像头帧的实际索引是 i
+
+            v_idx = start_video_idx + i
+            c_idx = i
+
+            # 确保索引在有效范围内
+            if v_idx < len(video_angles_joint_raw) and c_idx < len(camera_angles_joint_raw):
+                video_angle = video_angles_joint_raw[v_idx]
+                camera_angle = camera_angles_joint_raw[c_idx]
+
+                if video_angle is not None and camera_angle is not None:
+                    difference = abs(video_angle - camera_angle)
+                    if difference < score_threshold:
+                        accuracy_count += 1
+            # else: 如果索引无效，则不计入 accuracy_count
+
+        if comparison_length > 0:  # 使用 comparison_length 作为总帧数
+            joint_score = (accuracy_count / comparison_length) * 100
+            all_joint_scores.append(joint_score)
+
+    '''if min_len == 0:
         return 0
 
     all_joint_scores = []
@@ -117,7 +155,7 @@ def calculate_final_score(video_angles, camera_angles, score_threshold=20):
 
         if min_len > 0:
             joint_score = (accuracy_count / min_len) * 100
-            all_joint_scores.append(joint_score)
+            all_joint_scores.append(joint_score)'''
 
     final_score = 0
     if all_joint_scores:

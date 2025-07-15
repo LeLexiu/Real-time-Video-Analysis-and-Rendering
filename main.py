@@ -4,6 +4,7 @@ from tkinter import messagebox, filedialog
 import cv2
 import threading
 from collections import defaultdict
+import time
 from gui.gui import MainWindow
 from gui.vedio_score_page import ScoreDisplay
 from models.pose_model import load_pose_model, process_pose
@@ -37,6 +38,10 @@ class PoseApp:
         self.current_score = 0
         self.video_frame_count = 0
         self.camera_frame_count = 0
+
+        self.target_fps = 30  # frame rate for video and camara processing
+        self.frame_duration = 1.0 / self.target_fps # duration of each frame in seconds
+        self.reaction_time_frames = int(0.8 * self.target_fps)  # 0.8 seconds reaction time in frames
 
     # Callback function to load video file
     def _load_video_callback(self):
@@ -96,7 +101,19 @@ class PoseApp:
             self.stop_video()
             return
 
+        last_frame_time = time.time()  # record the time of the starting processed frame
+
         while self.cap_file.isOpened() and self.running_file:
+            '''Fixed frame rate processing'''
+            current_time = time.time()
+            elapsed_time = current_time - last_frame_time
+
+            # Wait if the current frame is processed too quickly
+            if elapsed_time < self.frame_duration:
+                time.sleep(self.frame_duration - elapsed_time)
+
+            last_frame_time = time.time()
+
             ret_file, frame_file = self.cap_file.read()
             if not ret_file:
                 break
@@ -126,7 +143,18 @@ class PoseApp:
             self.stop_cam()
             return
 
+        last_frame_time = time.time()
+
         while self.cap_cam.isOpened() and self.running_cam:
+            '''Fixed frame rate processing for webcam'''
+            current_time = time.time()
+            elapsed_time = current_time - last_frame_time
+
+            # Wait if the current frame is processed too quickly
+            if elapsed_time < self.frame_duration:
+                time.sleep(self.frame_duration - elapsed_time)
+            last_frame_time = time.time()  # Update the last frame time
+
             ret_cam, frame_cam = self.cap_cam.read()
             if not ret_cam:
                 break
@@ -167,8 +195,44 @@ class PoseApp:
 
     # Update the live score based on the current video and camera angles
     def update_live_score(self):
-        current_cam_idx = self.camera_frame_count - 1 # 当前摄像头帧的索引
-        # 确保有对应的视频帧和摄像头帧可以比较
+        # current_cam_idx = self.camera_frame_count - 1 # 当前摄像头帧的索引
+        current_video_idx = self.video_frame_count - 1  # 当前视频帧的索引
+        corresponding_cam_idx = current_video_idx - self.reaction_time_frames
+
+        if current_video_idx >= 0 and \
+                corresponding_cam_idx >= 0 and \
+                corresponding_cam_idx < self.camera_frame_count:  # 确保延迟索引不超出摄像头已捕获的范围
+
+            frame_accuracy = calculate_frame_score(self.video_angles, self.camera_angles, current_video_idx,
+                                                   self.score_threshold)
+
+            # 提取当前视频帧的关节角度
+            video_angles_current_frame = {
+                joint_name: self.video_angles[joint_name][current_video_idx]
+                for joint_name in JOINT_TRIPLETS if current_video_idx < len(self.video_angles[joint_name])
+            }
+
+            # 提取对应的摄像头延迟帧的关节角度
+            camera_angles_corresponding_frame = {
+                joint_name: self.camera_angles[joint_name][corresponding_cam_idx]
+                for joint_name in JOINT_TRIPLETS if corresponding_cam_idx < len(self.camera_angles[joint_name])
+            }
+
+            # 然后调用一个修改过的 calculate_frame_score，它接受字典形式的单帧角度
+            frame_accuracy = self._calculate_single_frame_accuracy(
+                video_angles_current_frame,
+                camera_angles_corresponding_frame,
+                self.score_threshold
+            )
+
+            if frame_accuracy is not None:
+                self.current_score += (frame_accuracy * 100) / len(JOINT_TRIPLETS)
+            self.score_display.update_score(int(self.current_score))
+        else:
+            # 如果帧数不够进行延迟对比，不进行实时更新，或者可以显示一个等待状态
+            self.score_display.update_score(int(self.current_score))  # 仍然更新显示当前分数
+
+        '''# Make sure the current index is valid
         if current_cam_idx >= 0 and current_cam_idx < self.video_frame_count:
             frame_accuracy = calculate_frame_score(self.video_angles, self.camera_angles, current_cam_idx, self.score_threshold)
             if frame_accuracy is not None:
@@ -177,11 +241,37 @@ class PoseApp:
             self.score_display.update_score(self.current_score)
         else:
             # 如果视频或摄像头帧数不匹配，不进行实时更新，或者可以显示一个等待状态
-            self.score_display.update_score(self.current_score) # 仍然更新显示当前分数
+            self.score_display.update_score(self.current_score) # 仍然更新显示当前分数'''
+
+    '''Calculate the accuracy for a single frame based on video and camera angles'''
+    def _calculate_single_frame_accuracy(self, video_angles_dict, camera_angles_dict, score_threshold):
+        frame_scores = []
+        for joint_name in JOINT_TRIPLETS:
+            v_angle = video_angles_dict.get(joint_name)
+            c_angle = camera_angles_dict.get(joint_name)
+
+            if v_angle is not None and c_angle is not None:
+                difference = abs(v_angle - c_angle)
+                if difference < score_threshold:
+                    frame_scores.append(1)
+                else:
+                    frame_scores.append(0)
+            else:
+                frame_scores.append(0)  # 角度缺失，该关节得 0 分
+
+        if frame_scores:
+            return sum(frame_scores) / len(frame_scores)
+        return 0  # 如果没有可比较的关节
 
     # Calculate the final score after processing all frames
     def calculate_final_score_wrapper(self):
-        final_score = calculate_final_score(self.video_angles, self.camera_angles, self.score_threshold)
+        #final_score = calculate_final_score(self.video_angles, self.camera_angles, self.score_threshold)
+        final_score = calculate_final_score(
+            self.video_angles,
+            self.camera_angles,
+            self.score_threshold,
+            reaction_time_frames=self.reaction_time_frames  # 传递延迟帧数
+        )
         self.current_score = final_score
         self.score_display.update_final_score(self.current_score)
         if self.video_frame_count == 0 or self.camera_frame_count == 0:
