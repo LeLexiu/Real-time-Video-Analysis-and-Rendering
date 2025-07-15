@@ -12,9 +12,8 @@ class ScoreDisplay:
     def update_final_score(self, final_score):
         self.score_label.config(text=f"Final score: {int(final_score)}")
 
-if __name__ == "__main__":
-    # 仅用于测试 score_gui.py 自身
+"""if __name__ == "__main__":
     root = tk.Tk()
     score_display = ScoreDisplay(root)
     score_display.update_score(85)
-    root.mainloop()
+    root.mainloop()"""

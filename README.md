@@ -17,6 +17,7 @@ Real-time-Video-Analysis-and-Rendering/
 │   └── face_model.py                # Wrapper for loading face detection/recognition model 
 │
 ├── gui/
+│   ├──_init_.py
 │   ├── dance_gui.py                 # GUI for video dance mode (contains PoseApp class) 视频跟跳 GUI
 │   └── face_gui.py                  # GUI for face recognition login/registration (if available) 人脸识别登录/注册界面（如有）
 │

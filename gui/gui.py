@@ -3,7 +3,7 @@ from tkinter import filedialog, messagebox
 from tkinter import ttk
 from PIL import Image, ImageTk
 import os
-import cv2 # 确保导入 cv2
+import cv2
 
 class MainWindow:
     def __init__(self, root, load_video_command, start_video_command, stop_video_command, toggle_video_display_command, start_cam_command, stop_cam_command):
@@ -17,11 +17,11 @@ class MainWindow:
         self.root.option_add("*Font", default_font)
 
         self.video_path = ""
-        self.show_video_frame = True # 移到这里，由主程序控制
+        self.show_video_frame = True
 
         self.left_frame = ttk.Frame(self.root)
         self.left_frame.pack(side=tk.LEFT, padx=10)
-        self.right_frame = ttk.Frame(self.root) # 修正这里，应该是 self.root
+        self.right_frame = ttk.Frame(self.root)
         self.right_frame.pack(side=tk.RIGHT, padx=10)
 
         # Video File Window
@@ -51,18 +51,18 @@ class MainWindow:
     #     return self.video_path
 
     def update_label(self, label, frame):
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) # OpenCV uses BGR by default, convert to RGB for PIL->to avoid color issues
         img = Image.fromarray(rgb)
         img = img.resize((640, 384))
         imgtk = ImageTk.PhotoImage(image=img)
         label.imgtk = imgtk
         label.configure(image=imgtk)
 
-if __name__ == "__main__":
-    # 仅用于测试 gui.py 自身，实际运行时不执行
+"""if __name__ == "__main__":
+    # Only for testing the GUI without the full application context
     root = tk.Tk()
     # 传入 lambda 函数作为占位符
     main_window = MainWindow(root, lambda: print("Load Video Clicked"), lambda: print("Start Video Clicked"),
                              lambda: print("Stop Video Clicked"), lambda: print("Toggle Video Clicked"),
                              lambda: print("Start Cam Clicked"), lambda: print("Stop Cam Clicked"))
-    root.mainloop()
+    root.mainloop()"""
