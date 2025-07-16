@@ -5,7 +5,7 @@ from PIL import Image, ImageTk
 import os
 import cv2
 
-class MainWindow:
+class VedioModeWindow:
     def __init__(self, root, load_video_command, start_video_command, stop_video_command, toggle_video_display_command, start_cam_command, stop_cam_command):
         self.root = root
         self.root.title("Stickman Dance GUI")
@@ -42,7 +42,7 @@ class MainWindow:
         ttk.Button(self.controls_cam, text="Start Webcam", command=start_cam_command).pack(side=tk.LEFT, padx=5)
         ttk.Button(self.controls_cam, text="Stop Webcam", command=stop_cam_command).pack(side=tk.LEFT, padx=5)
 
-    # 这里的 load_video 不再是类方法，而是由 main.py 调用 filedialog
+    # 这里的 load_video 不再是类方法，而是由 vedio_mode.py 调用 filedialog
     # def load_video(self):
     #     path = filedialog.askopenfilename(filetypes=[("MP4 files", "*.mp4"), ("All files", "*.*")])
     #     if path:
