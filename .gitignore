@@ -4,7 +4,8 @@ _pycache_/
 gui/__pycache__/
 just_dance/vedio_mode/__pycache__/
 models/__pycache__/
-facial_recognition/CamaraTest.py
+facial_recognition/Task1/CamaraTest.py
 assets(demo)/dance_example_1.mp4
-facial_recognition/facial_expression_dataset.zip
+facial_recognition/Task1/facial_expression_dataset.zip
+facial_recognition/facial_expression_dataset
 Visual_Computing_Project.pdf

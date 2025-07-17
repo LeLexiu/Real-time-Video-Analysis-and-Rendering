@@ -14,7 +14,7 @@ JOINT_TRIPLETS = {
 }
 
 def calculate_angle(keypoints_pixels, p1_idx, p2_idx, p3_idx):
-    """Calculates the angle between three keypoints."""
+    #Calculates the angle between three keypoints.
     # 确保所有三个关键点都存在且有效
     if not (0 <= p1_idx < len(keypoints_pixels) and
             0 <= p2_idx < len(keypoints_pixels) and
@@ -36,7 +36,7 @@ def calculate_angle(keypoints_pixels, p1_idx, p2_idx, p3_idx):
 
     # 避免除以零（如果点重合）
     if magnitude_v1 == 0 or magnitude_v2 == 0:
-        return None # 无法形成有效角度
+       return None # 无法形成有效角度
 
     # 计算角度的余弦值（使用点积）
     dot_product = np.dot(v1, v2)
@@ -62,8 +62,9 @@ def calculate_angle(keypoints_pixels, p1_idx, p2_idx, p3_idx):
 def calculate_frame_score(video_angles, camera_angles, frame_index, score_threshold=20):
     """Calculates the score for a single frame."""
     frame_scores = []
+    # Create a list to store scores for each joint triplet
     for joint_name in JOINT_TRIPLETS:
-        video_angle_list = video_angles.get(joint_name, []) # 获取列表，避免 KeyError
+        video_angle_list = video_angles.get(joint_name, [])
         camera_angle_list = camera_angles.get(joint_name, [])
 
         if frame_index < len(video_angle_list) and frame_index < len(camera_angle_list):
@@ -72,21 +73,21 @@ def calculate_frame_score(video_angles, camera_angles, frame_index, score_thresh
             if v_angle is not None and c_angle is not None:
                 difference = abs(v_angle - c_angle)
                 if difference < score_threshold:
-                    frame_scores.append(1) # 1 表示该关节在该帧是“准确”的
+                    frame_scores.append(1) # 1 means the angles are close enough
                 else:
                     frame_scores.append(0)
             else:
-                frame_scores.append(0) # 如果任一角度为 None，则该关节该帧不得分
+                frame_scores.append(0) # 0 means one of the angles is missing
         else:
-            frame_scores.append(0) # 如果索引超出范围，也不得分
+            frame_scores.append(0) # out of bounds for this frame
 
     if frame_scores:
         return sum(frame_scores) / len(frame_scores)
     return 0 # 如果没有可比较的关节，返回0
 
-def calculate_final_score(video_angles, camera_angles, score_threshold=20):
+def calculate_final_score(video_angles, camera_angles, score_threshold=20, reaction_time_frames=0):
     """Calculates the final score based on the entire video."""
-    # 确保字典不为空，并且有至少一个关节的角度列表
+    # 确保字典不为空，并且有至少一个关节的角度列表 Make sure the dictionaries are not empty and have at least one joint's angle list
     if not video_angles or not camera_angles:
         return 0
 
@@ -94,14 +95,52 @@ def calculate_final_score(video_angles, camera_angles, score_threshold=20):
     first_joint_video_len = len(next(iter(video_angles.values()))) if video_angles else 0
     first_joint_camera_len = len(next(iter(camera_angles.values()))) if camera_angles else 0
 
-    min_len = min(first_joint_video_len, first_joint_camera_len)
+    start_video_idx = reaction_time_frames
 
-    if min_len == 0:
+    #min_len = min(first_joint_video_len, first_joint_camera_len)
+    comparison_length = min(
+        first_joint_video_len - start_video_idx,
+        first_joint_camera_len
+    )
+
+    if comparison_length <= 0:  # 如果没有足够的帧进行对比
         return 0
 
     all_joint_scores = []
     for joint_name in JOINT_TRIPLETS:
-        video_angles_joint = video_angles.get(joint_name, [])[:min_len] # 安全获取并截断
+        # 获取关节的原始角度列表
+        video_angles_joint_raw = video_angles.get(joint_name, [])
+        camera_angles_joint_raw = camera_angles.get(joint_name, [])
+
+        accuracy_count = 0
+        for i in range(comparison_length):
+            # 视频帧的实际索引是 start_video_idx + i
+            # 摄像头帧的实际索引是 i
+
+            v_idx = start_video_idx + i
+            c_idx = i
+
+            # 确保索引在有效范围内
+            if v_idx < len(video_angles_joint_raw) and c_idx < len(camera_angles_joint_raw):
+                video_angle = video_angles_joint_raw[v_idx]
+                camera_angle = camera_angles_joint_raw[c_idx]
+
+                if video_angle is not None and camera_angle is not None:
+                    difference = abs(video_angle - camera_angle)
+                    if difference < score_threshold:
+                        accuracy_count += 1
+            # else: 如果索引无效，则不计入 accuracy_count
+
+        if comparison_length > 0:  # 使用 comparison_length 作为总帧数
+            joint_score = (accuracy_count / comparison_length) * 100
+            all_joint_scores.append(joint_score)
+
+    '''if min_len == 0:
+        return 0
+
+    all_joint_scores = []
+    for joint_name in JOINT_TRIPLETS:
+        video_angles_joint = video_angles.get(joint_name, [])[:min_len] # Safe slicing and ensuring the same length
         camera_angles_joint = camera_angles.get(joint_name, [])[:min_len]
 
         accuracy_count = 0
@@ -116,16 +155,17 @@ def calculate_final_score(video_angles, camera_angles, score_threshold=20):
 
         if min_len > 0:
             joint_score = (accuracy_count / min_len) * 100
-            all_joint_scores.append(joint_score)
+            all_joint_scores.append(joint_score)'''
 
     final_score = 0
     if all_joint_scores:
         final_score = np.mean(all_joint_scores)
-        final_score += 20 # 奖励分
+        # final_score += 20 # 奖励分
 
-    return min(int(final_score), 100) # 确保分数不超过100
+    return min(int(final_score), 100)
 
-if __name__ == "__main__":
+
+"""if __name__ == "__main__":
     # Example usage:
     video_angles_example = defaultdict(list)
     camera_angles_example = defaultdict(list)
@@ -147,4 +187,4 @@ if __name__ == "__main__":
     camera_angles_incomplete["left_elbow"].extend([88, 92, 105]) # Camera has more frames
 
     final_score_incomplete = calculate_final_score(video_angles_incomplete, camera_angles_incomplete)
-    print(f"Final score with incomplete data: {final_score_incomplete}")
+    print(f"Final score with incomplete data: {final_score_incomplete}")"""
