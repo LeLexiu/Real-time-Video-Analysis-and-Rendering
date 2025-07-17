@@ -353,4 +353,3 @@ class FreestyleMode:
         tk.Label(ranking_win, text=stats_text, font=("Arial", 10), fg="gray").pack(pady=5)
 
         tk.Button(ranking_win, text="Close", font=("Arial", 14), command=ranking_win.destroy).pack(pady=20)
-
